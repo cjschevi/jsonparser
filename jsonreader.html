@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<!--jsonparser.html written by Cory Scheviak for Rally Software-->
+
+<html>
+<head>
+</head>
+<body>
+
+<script src="http://code.jquery.com/jquery-latest.js" type="text/javascript"></script>
+<script type="text/javascript">
+$.getJSON("http://www4.ncsu.edu/~cjschevi/snapshot.json", function(data) {
+
+  var februaryTimes = {};
+  var februaryWorkHours = {};
+  var scheduleStates = {};
+
+  $.each(data, function(index, obj) {    
+    
+    //the value representing the maximum bound of february 2012, non-inclusive
+    var maxtime = new Date("2012-02-29T23:59:59.999Z").getTime();
+
+    //the value representing the minimum bound of februrary 2012, non-inclusive
+    var mintime = new Date("2012-02-01T00:00:00.000Z").getTime();
+    
+    //the value representing the end time of this object
+    var endtime = new Date(obj._ValidTo).getTime();
+    
+    //the value representing the start time of this object
+    var starttime = new Date(obj._ValidFrom).getTime();
+    
+    //Date object representing the time this object is valid from
+    var startdate = new Date(obj._ValidFrom);
+    
+    //Date object representing the time this object is valid until
+    var enddate = new Date(obj._ValidTo);
+    
+    //if value is null, initialize to 0 so we can increment if necessary
+    if (!februaryTimes[obj.ObjectID]) {
+      februaryTimes[obj.ObjectID] = 0;
+    }
+
+    if (endtime <= maxtime) {
+      if (starttime > mintime) {
+        februaryTimes[obj.ObjectID] += endtime - starttime;
+      }      
+
+      //end = endtime - starttime;
+      else {
+        if (endtime > mintime) {
+          februaryTimes[obj.ObjectID] += endtime - mintime;
+          //end = endtime - mintime;
+        } else {
+          //end = 0;
+        }
+      }
+    } else {
+      if (starttime >= mintime) {
+        if (starttime < mintime) {
+          februaryTimes[obj.ObjectID] += starttime - mintime;
+          //end = starttime - mintime;
+        } else {
+          //end = 0
+        }
+      } else {
+        februaryTimes[obj.ObjectID] += maxtime - mintime;
+        //end = maxtime - mintime;
+      }
+    }
+    
+    //parts 2 and 3
+
+    //if value is null, initialize to 0 so we can increment if necessary
+    if (!februaryWorkHours[obj.ObjectID]) {
+      februaryWorkHours[obj.ObjectID] = 0;
+    }
+    
+    //if value is null, initialize to 0 so we can increment if necessary
+    if (!scheduleStates[obj.ScheduleState]) {
+      scheduleStates[obj.ScheduleState] = 0;
+    }
+    
+    //move start day to a weekday (if it is already on one, then move it forward one since we will account for the hours from that day)
+    if (startdate.getUTCDay() == 6) {
+      startdate.setUTCDate(startdate.getUTCDate() + 2);
+      startdate.setUTCHours(9);
+      startdate.setUTCMinutes(0);
+      startdate.setUTCSeconds(0);
+      startdate.setUTCMilliseconds(0);
+    } else
+    if (startdate.getUTCDay() == 0) {
+      startdate.setUTCDate(startdate.getUTCDate() + 1);
+      startdate.setUTCHours(9);
+      startdate.setUTCMinutes(0);
+      startdate.setUTCSeconds(0);
+      startdate.setUTCMilliseconds(0);
+    } 
+    
+    //move end day to a weekday (if it is already on one, then move it back one since we will account for the hours from that day)
+    if (enddate.getUTCDay() == 0) {
+      enddate.setUTCDate(enddate.getUTCDate() - 2);
+      enddate.setUTCHours(17);
+      enddate.setUTCMinutes(0);
+      enddate.setUTCSeconds(0);
+      enddate.setUTCMilliseconds(0);
+    } else {
+      if (enddate.getUTCDay() == 1) {
+        enddate.setUTCDate(enddate.getUTCDate() - 1);
+        enddate.setUTCHours(17);
+        enddate.setUTCMinutes(0);
+        enddate.setUTCSeconds(0);
+        enddate.setUTCMilliseconds(0);
+      }
+    }
+    
+    var totaltime = 0;
+    
+    //find the number of weekdays in between the two dates (NOTE: we subtract two so that the start/end dates are not included themselves in the count)
+    var numweekdays = (6 - startdate.getUTCDay()) + enddate.getUTCDay() + 5 * ((enddate.getUTCDate() - startdate.getUTCDate())%2) - 2;
+    
+    //if start < Feb 2012 && end == Feb 2012
+    if (starttime < mintime && endtime >= mintime && endtime <= maxtime) {
+      startdate = new Date(mintime);
+
+      var count = 0;
+      
+      for (var i = startdate.getUTCDate(); i < enddate.getUTCDate(); i++) {
+        var f = new Date(startdate.getTime() + (i - 1)*86400000);
+        
+        if (f.getUTCDay() > 0 && f.getUTCDay() < 6) {
+          scheduleStates[obj.ScheduleState] += 8 * 3600000;  //add to the amount of time of this schedule state
+          count++;
+        }
+      }
+      
+      numweekdays = count;
+      
+      if (enddate.getUTCHours() >= 9) {
+        scheduleStates[obj.ScheduleState] += ((enddate.getUTCHours() - 9) * 3600000) + (enddate.getUTCMinutes() * 60000) + (enddate.getUTCSeconds() * 1000) + enddate.getUTCMilliseconds();
+        totaltime = (8 * 3600000 * numweekdays) + ((enddate.getUTCHours() - 9) * 3600000) + (enddate.getUTCMinutes() * 60000) + (enddate.getUTCSeconds() * 1000) + enddate.getUTCMilliseconds();
+      } else {
+        totaltime = (8 * 3600000 * numweekdays);
+      }        
+      
+    } else    //if start == Feb 2012 && end == Feb 2012
+    if (starttime >= mintime && starttime <= maxtime && endtime >= mintime && endtime <= maxtime) {
+      //START add the time from the enddate
+      
+      var count = 0;
+      
+      for (var i = startdate.getUTCDate(); i < enddate.getUTCDate(); i++) {
+        var f = new Date(startdate.getTime() + (i - 1)*86400000);
+        
+        if (f.getUTCDay() > 0 && f.getUTCDay() < 6) {
+          scheduleStates[obj.ScheduleState] += 8 * 3600000;  //add to the amount of time of this schedule state
+          count++;
+        }
+      }
+      
+      numweekdays = count;
+      
+      if (enddate.getUTCHours() >= 9) {
+        if (enddate.getUTCDate() != startdate.getUTCDate()) {
+          scheduleStates[obj.ScheduleState] = ((enddate.getUTCHours() - 9) * 3600000) + (enddate.getUTCMinutes() * 60000) + (enddate.getUTCSeconds() * 1000) + enddate.getUTCMilliseconds();
+          totaltime = (8 * 3600000 * numweekdays) + ((enddate.getUTCHours() - 9) * 3600000) + (enddate.getUTCMinutes() * 60000) + (enddate.getUTCSeconds() * 1000) + enddate.getUTCMilliseconds();
+        } else {
+          totaltime = (8 * 3600000 * numweekdays) + ((enddate.getUTCHours() - startdate.getUTCHours()) * 3600000) + (enddate.getUTCMinutes() * 60000) + (enddate.getUTCSeconds() * 1000) + enddate.getUTCMilliseconds();
+          scheduleStates[obj.ScheduleState] += ((enddate.getUTCHours() - startdate.getUTCHours()) * 3600000) + (enddate.getUTCMinutes() * 60000) + (enddate.getUTCSeconds() * 1000) + enddate.getUTCMilliseconds();
+          scheduleStates[obj.ScheduleState] -= startdate.getUTCMinutes() * 6000;
+          scheduleStates[obj.ScheduleState] -= startdate.getUTCSeconds() * 1000;
+          scheduleStates[obj.ScheduleState] -= startdate.getUTCMilliseconds();
+          totaltime -= startdate.getUTCMinutes() * 6000;
+          totaltime -= startdate.getUTCSeconds() * 1000;
+          totaltime -= startdate.getUTCMilliseconds();
+        }
+      } else {
+        totaltime = (8 * 3600000 * numweekdays);
+      }       
+      //END add the time from the enddate
+      
+      //add the time from the days in between start and end
+      totaltime += (8 * 3600000 * (numweekdays - 1));
+      
+    } else    //if start == Feb 2012 && end > Feb 2012
+    if (starttime >= mintime && starttime <= maxtime && endtime > maxtime) {
+      enddate = new Date(maxtime);
+      var count = 0;
+      
+      for (var i = startdate.getUTCDate() + 1; i <= enddate.getUTCDate(); i++) {
+        var f = new Date(startdate.getTime() + (i - 1)*86400000);
+        
+        if (f.getUTCDay() > 0 && f.getUTCDay() < 6) {
+          scheduleStates[obj.ScheduleState] += 8 * 3600000;  //add to the amount of time of this schedule state
+          count++;
+        }
+      }      
+      numweekdays = count;
+      
+      if (startdate.getUTCHours() < 17) {
+        //add the time from the start date
+        
+        scheduleStates[obj.ScheduleState] +=(17 * 3600000) - (startdate.getUTCHours() * 3600000) + (startdate.getUTCMinutes() * 60000) + (startdate.getUTCSeconds() * 1000) + startdate.getUTCMilliseconds();
+        totaltime += (17 * 3600000) - (startdate.getUTCHours() * 3600000) + (startdate.getUTCMinutes() * 60000) + (startdate.getUTCSeconds() * 1000) + startdate.getUTCMilliseconds();   
+      }
+
+      //add the time from the days in between start and end
+      totaltime += (8 * 3600000 * numweekdays);      
+      
+    } else        //if start < Feb 2012 && end > Feb 2012
+    if (starttime < mintime && endtime > maxtime) {
+      startdate = new Date(mintime);
+      enddate = new Date(maxtime);
+      
+      var count = 0;
+      
+      for (var i = startdate.getUTCDate(); i < enddate.getUTCDate(); i++) {
+        var f = new Date(startdate.getTime() + (i - 1)*86400000);
+        
+        if (f.getUTCDay() > 0 && f.getUTCDay() < 6) {
+          scheduleStates[obj.ScheduleState] += 8 * 3600000;  //add to the amount of time of this schedule state
+          count++;
+        }
+      }
+      
+      totaltime = count * 8 * 3600000;
+    }
+    
+    //add the total amount of time worked during the week in Feb 2012
+    februaryWorkHours[obj.ObjectID] += totaltime;  
+    
+  });
+  
+  //answer question 1
+  for (var id in februaryTimes) {
+    var hours = Math.floor(februaryTimes[id] / 3600000);
+    var minutes = Math.floor((februaryTimes[id] - hours * 3600000) / 60000);
+    var seconds = Math.floor((februaryTimes[id] - hours * 3600000 - minutes * 60000) / 1000);
+    var milliseconds = Math.floor(februaryTimes[id] % 1000);
+    
+    console.log("During the month of February 2012, the total time spent on ObjectID: \"" + id + "\" is: " + hours + " hours " + minutes + " minutes " + seconds + " seconds " + milliseconds + " milliseconds.");
+  }
+
+  //answer question 2
+  for (var id in februaryWorkHours) {
+    var hours = Math.floor(februaryWorkHours[id] / 3600000);
+    var minutes = Math.floor((februaryWorkHours[id] - hours * 3600000) / 60000);
+    var seconds = Math.floor((februaryWorkHours[id] - hours * 3600000 - minutes * 60000) / 1000);
+    var milliseconds = Math.floor(februaryWorkHours[id] % 1000);      
+    
+    console.log("During the month of February 2012, the total time spent on ObjectID: \"" + id + "\" during working hours is: " + hours + " hours " + minutes + " minutes " + seconds + " seconds " + milliseconds + " milliseconds.");
+  }
+  
+  //answer question 3
+  for (var id in scheduleStates) {
+    var hours = Math.floor(scheduleStates[id] / 3600000);
+    var minutes = Math.floor((scheduleStates[id] - hours * 3600000) / 60000);
+    var seconds = Math.floor((scheduleStates[id] - hours * 3600000 - minutes * 60000) / 1000);
+    var milliseconds = Math.floor(scheduleStates[id] % 1000);      
+    
+    console.log("During the month of February 2012, the total time spent on ScheduleState: \"" + id + "\" during working hours is: " + hours + " hours " + minutes + " minutes " + seconds + " seconds " + milliseconds + " milliseconds.");
+  }
+  
+});
+
+</script>
+
+</body>
+</html>
