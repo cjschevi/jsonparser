@@ -1,7 +1,7 @@
 jsonparser
 ==========
 
-Javascript/jQuery assignment for Rally Software.
+Javascript/jQuery assignment for the interview process at Rally Software.
 
 Answers the following questions:
 
